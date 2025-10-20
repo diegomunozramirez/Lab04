@@ -1,0 +1,90 @@
+// ejercicio2.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+int is_word_char(char c) {
+    // Consideramos parte de palabra letras y números (puedes ajustar)
+    return isalnum((unsigned char)c);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc != 4) {
+        fprintf(stderr, "Uso: %s archivo_entrada palabra_buscar palabra_reemplazo\n", argv[0]);
+        return 1;
+    }
+    const char *inname = argv[1];
+    const char *target = argv[2];
+    const char *replacement = argv[3];
+
+    FILE *fin = fopen(inname, "r");
+    if (!fin) {
+        perror("Error al abrir archivo de entrada");
+        return 1;
+    }
+
+    // Generamos nombre de salida: inname + ".out"
+    size_t outlen = strlen(inname) + 5;
+    char *outname = malloc(outlen);
+    if (!outname) { fclose(fin); return 1; }
+    snprintf(outname, outlen, "%s.out", inname);
+
+    FILE *fout = fopen(outname, "w");
+    if (!fout) {
+        perror("Error al crear archivo de salida");
+        free(outname);
+        fclose(fin);
+        return 1;
+    }
+
+    // Buffer dinámico para palabra actual
+    size_t bufcap = 128;
+    char *buf = malloc(bufcap);
+    if (!buf) { fclose(fin); fclose(fout); free(outname); return 1; }
+    size_t buflen = 0;
+
+    int c;
+    while ((c = fgetc(fin)) != EOF) {
+        if (is_word_char((char)c)) {
+            // agregar a palabra
+            if (buflen + 1 >= bufcap) {
+                bufcap *= 2;
+                char *tmp = realloc(buf, bufcap);
+                if (!tmp) { perror("realloc"); free(buf); fclose(fin); fclose(fout); free(outname); return 1; }
+                buf = tmp;
+            }
+            buf[buflen++] = (char)c;
+        } else {
+            // fin de palabra: procesar si hay contenido
+            if (buflen > 0) {
+                buf[buflen] = '\0';
+                if (strcmp(buf, target) == 0) {
+                    fputs(replacement, fout);
+                } else {
+                    fputs(buf, fout);
+                }
+                buflen = 0;
+            }
+            // escribir el caracter no-palabra (signos de puntuación, espacios, etc.)
+            fputc(c, fout);
+        }
+    }
+    // Si el archivo terminó justo al final de una palabra
+    if (buflen > 0) {
+        buf[buflen] = '\0';
+        if (strcmp(buf, target) == 0) {
+            fputs(replacement, fout);
+        } else {
+            fputs(buf, fout);
+        }
+    }
+
+    // cerrar y liberar
+    free(buf);
+    fclose(fin);
+    fclose(fout);
+    printf("Archivo procesado. Salida escrita en: %s\n", outname);
+    free(outname);
+    return 0;
+}
